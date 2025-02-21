@@ -1,0 +1,52 @@
+stages:
+  - validate
+  - plan
+  - apply
+  - destroy
+
+variables:
+  TF_VAR_region: "us-east-1"
+  TF_VAR_cost_limit: '0'
+
+image:
+  name: hashicorp/terraform:light
+  entrypoint:
+    - '/usr/bin/env'
+    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
+
+before_script:
+    - export AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
+    - export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+
+validate:
+  stage: validate
+  script:
+    - terraform init
+    - terraform validate
+
+plan:
+  stage: plan
+  script:
+    - terraform init
+    - terraform plan -out=tfplan
+  artifacts:
+    paths:
+      - tfplan
+
+apply:
+  stage: apply
+  when: manual
+  only:
+    - main
+  script:
+    - terraform init
+    - terraform apply -auto-approve tfplan
+
+destroy:
+  stage: destroy
+  when: manual
+  only:
+    - main
+  script:
+    - terraform init -reconfigure
+    - terraform destroy -auto-approve
