@@ -1,52 +1,25 @@
 stages:
-  - validate
-  - plan
-  - apply
-  - destroy
+  - build
 
 variables:
-  TF_VAR_region: "us-east-1"
-  TF_VAR_cost_limit: '0'
+  CI_REGISTRY_IMAGE: note-app
+  TAG_COMMIT: $CI_COMMIT_SHORT_SHA
 
-image:
-  name: hashicorp/terraform:light
-  entrypoint:
-    - '/usr/bin/env'
-    - 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'
-
-before_script:
-    - export AWS_ACCESS_KEY=${AWS_ACCESS_KEY_ID}
-    - export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-
-validate:
-  stage: validate
+build:
+  image: docker:latest
+  stage: build
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
   script:
-    - terraform init
-    - terraform validate
+    - docker build -t $CI_REGISTRY_USER/$CI_REGISTRY_IMAGE:$TAG_COMMIT .
+    - docker push $CI_REGISTRY_USER/$CI_REGISTRY_IMAGE:$TAG_COMMIT
 
-plan:
-  stage: plan
-  script:
-    - terraform init
-    - terraform plan -out=tfplan
-  artifacts:
-    paths:
-      - tfplan
+  tags:
+    - self-hosted
+    
 
-apply:
-  stage: apply
-  when: manual
+
   only:
     - main
-  script:
-    - terraform init
-    - terraform apply -auto-approve tfplan
-
-destroy:
-  stage: destroy
-  when: manual
-  only:
-    - main
-  script:
-    - terraform init -reconfigure
-    - terraform destroy -auto-approve
