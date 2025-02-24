@@ -1,25 +1,37 @@
+# .gitlab-ci-template.yml
+
 stages:
   - build
+  - push
+  - deploy
 
 variables:
-  CI_REGISTRY_IMAGE: note-app
-  TAG_COMMIT: $CI_COMMIT_SHORT_SHA
+  DOCKER_IMAGE: "$CI_REGISTRY_IMAGE:$CI_COMMIT_REF_SLUG"
 
-build:
-  image: docker:latest
+build_docker_image:
   stage: build
+  image: docker:latest
   services:
     - docker:dind
-  before_script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
   script:
-    - docker build -t $CI_REGISTRY_USER/$CI_REGISTRY_IMAGE:$TAG_COMMIT .
-    - docker push $CI_REGISTRY_USER/$CI_REGISTRY_IMAGE:$TAG_COMMIT
+    - docker build -t $DOCKER_IMAGE .
+  artifacts:
+    paths:
+      - Dockerfile
+      - .dockerignore
 
-  tags:
-    - self-hosted
-    
+push_docker_image:
+  stage: push
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin $CI_REGISTRY
+    - docker push $DOCKER_IMAGE
 
-
-  only:
-    - main
+deploy_docker_image:
+  stage: deploy
+  image: docker:latest
+  script:
+    - echo "Deploying $DOCKER_IMAGE"
+    - docker run -d --rm --name my_app $DOCKER_IMAGE
